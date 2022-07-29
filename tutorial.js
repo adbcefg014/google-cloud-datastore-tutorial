@@ -5,8 +5,8 @@ let Datastore = require('@google-cloud/datastore')
 
 /* CONFIGURATION */
 let config = {
-    gcpProjectId: '',
-    gcpPubSubSubscriptionName: '',
+    gcpProjectId: 'c177-sensors',
+    gcpPubSubSubscriptionName: 'projects/c177-sensors/subscriptions/ingest',
     gcpServiceAccountKeyFilePath: './gcp_private_key.json'
 }
 _checkConfig();
@@ -27,6 +27,7 @@ subscription.on('message', message => {
     // message.id = ID used to acknowledge its receival.
     // message.data = Contents of the message.
     // message.attributes = Attributes of the message.
+
     storeEvent(message);
     message.ack();
 });
@@ -41,19 +42,54 @@ const datastore = new Datastore({
 console.log(colors.magenta('Authentication successful!'))
 
 function storeEvent(message) {
-    let key = datastore.key('ParticleEvent');
+    let key = datastore.key(message.attributes.device_id);
 
-    datastore
-        .save({
-            key: key,
-            data: _createParticleEventObjectForStorage(message)
-        })
-        .then(() => {
-            console.log(colors.green('Particle event stored in Datastore!\r\n'), _createParticleEventObjectForStorage(message, true))
-        })
-        .catch(err => {
-            console.log(colors.red('There was an error storing the event:'), err);
+    if (String(message.data) === "test-event") {
+        // To process test events from Particle Cloud test button
+        datastore
+            .save({
+                key: key,
+                data: _createParticleEventObjectForStorage(message)
+            })
+            .then(() => {
+                console.log(colors.green('Particle event stored in Datastore!\r\n'), _createParticleEventObjectForStorage(message, true))
+            })
+            .catch(err => {
+                console.log(colors.red('There was an error storing the event:'), err);
+            });
+
+    } else {
+
+        // Sets of sensor readings processed here
+        const dataJson = JSON.parse(message.data);
+        
+        Object.values(dataJson).forEach(readingsSet => {
+            let obj = {};
+            Object.entries(readingsSet).forEach(([key, value]) => {
+                // Add each entry of sensor reading into obj, checking if value is a Number
+                if (Number.isNaN(`${value}`)) {
+                    obj[`${key}`] = `${value}`;
+                } else if (`${key}` === "TS") {
+                    // Special catch for Timestamp, as it apparently is a number
+                    obj[`${key}`] = `${value}`;
+                } else {
+                    obj[`${key}`] = Number(`${value}`);
+                }
+            })
+
+            datastore
+                .save({
+                    key: key,
+                    data: obj
+                })
+                .then(() => {
+                    console.log(colors.green('Particle event stored in Datastore!\r\n'), colors.grey(util.inspect(obj)))
+                })
+                .catch(err => {
+                    console.log(colors.red('There was an error storing the event:'), err);
+                });
         });
+    }
 
 };
 /* END DATASTORE */
@@ -76,7 +112,7 @@ function _createParticleEventObjectForStorage(message, log) {
         gc_pub_sub_id: message.id,
         device_id: message.attributes.device_id,
         event: message.attributes.event,
-        data: message.data,
+        data: String(message.data),
         published_at: message.attributes.published_at
     }
 
@@ -86,4 +122,5 @@ function _createParticleEventObjectForStorage(message, log) {
         return obj;
     }
 };
+
 /* END HELPERS */
