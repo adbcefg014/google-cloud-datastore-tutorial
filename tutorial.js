@@ -44,52 +44,55 @@ console.log(colors.magenta('Authentication successful!'))
 function storeEvent(message) {
     let key = datastore.key(message.attributes.device_id);
 
-    if (String(message.data) === "test-event") {
-        // To process test events from Particle Cloud test button
+    // Process incoming data
+    try {
+        const dataJson = JSON.parse(message.data);
+    } catch (err) {
+        // Incoming data is not in format of the sensors' data, thus process as the original default
+        datastore
+        .save({
+            key: key,
+            data: _createParticleEventObjectForStorage(message)
+        })
+        .then(() => {
+            console.log(colors.green('Particle event stored in Datastore!\r\n'), _createParticleEventObjectForStorage(message, true))
+        })
+        .catch(err => {
+            console.log(colors.red('There was an error storing the event:'), err);
+        });
+
+        return;
+    }
+    
+    // Process the incoming sensor data sets for Database insertion
+    Object.values(dataJson).forEach(readingsSet => {
+        let obj = {};
+
+        // Add each entry of sensor reading into obj, checking if value is a Number
+        Object.entries(readingsSet).forEach(([key, value]) => {
+            if (Number.isNaN(`${value}`)) {
+                obj[`${key}`] = `${value}`;
+            } else if (`${key}` === "TS") {
+                // Special catch for Timestamp, as it apparently is a number
+                obj[`${key}`] = `${value}`;
+            } else {
+                obj[`${key}`] = Number(`${value}`);
+            }
+        })
+
+        // Add processed sensor data set to Database
         datastore
             .save({
                 key: key,
-                data: _createParticleEventObjectForStorage(message)
+                data: obj
             })
             .then(() => {
-                console.log(colors.green('Particle event stored in Datastore!\r\n'), _createParticleEventObjectForStorage(message, true))
+                console.log(colors.green('Particle event stored in Datastore!\r\n'), colors.grey(util.inspect(obj)))
             })
             .catch(err => {
                 console.log(colors.red('There was an error storing the event:'), err);
             });
-
-    } else {
-
-        // Sets of sensor readings processed here
-        const dataJson = JSON.parse(message.data);
-        
-        Object.values(dataJson).forEach(readingsSet => {
-            let obj = {};
-            Object.entries(readingsSet).forEach(([key, value]) => {
-                // Add each entry of sensor reading into obj, checking if value is a Number
-                if (Number.isNaN(`${value}`)) {
-                    obj[`${key}`] = `${value}`;
-                } else if (`${key}` === "TS") {
-                    // Special catch for Timestamp, as it apparently is a number
-                    obj[`${key}`] = `${value}`;
-                } else {
-                    obj[`${key}`] = Number(`${value}`);
-                }
-            })
-
-            datastore
-                .save({
-                    key: key,
-                    data: obj
-                })
-                .then(() => {
-                    console.log(colors.green('Particle event stored in Datastore!\r\n'), colors.grey(util.inspect(obj)))
-                })
-                .catch(err => {
-                    console.log(colors.red('There was an error storing the event:'), err);
-                });
-        });
-    }
+    });
 
 };
 /* END DATASTORE */
