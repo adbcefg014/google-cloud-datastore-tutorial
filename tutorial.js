@@ -65,25 +65,25 @@ function storeEvent(message) {
     }
     
     // Process the incoming sensor data sets for Database insertion
-    Object.values(dataJson).forEach(readingsSet => {
+    let deviceID;
+
+    // Add each array element into obj, corresponding to its representation
+    for (let arraySetElement = 0; arraySetElement < dataJson.length; arraySetElement++) {
         let obj = {};
+        switch (arraySet) {
+            case (0):
+                deviceID = dataJson[arraySetElement];
+                break;
+            
+            // Process sensor reading set(s)
+            default:
+                obj = processReadingsSet(dataJson[arraySetElement], obj);
+        }
 
-        // Add each entry of sensor reading into obj, checking if value is a Number
-        Object.entries(readingsSet).forEach(([key, value]) => {
-            if (Number.isNaN(`${value}`)) {
-                obj[`${key}`] = `${value}`;
-            } else if (`${key}` === "TS") {
-                // Special catch for Timestamp, as it apparently is a number
-                obj[`${key}`] = `${value}`;
-            } else {
-                obj[`${key}`] = Number(`${value}`);
-            }
-        })
-
-        // Add processed sensor data set to Database
+        // Add processed set of sensor readings to Database
         datastore
             .save({
-                key: key,
+                key: deviceID,
                 data: obj
             })
             .then(() => {
@@ -92,8 +92,7 @@ function storeEvent(message) {
             .catch(err => {
                 console.log(colors.red('There was an error storing the event:'), err);
             });
-    });
-
+    }
 };
 /* END DATASTORE */
 
@@ -125,5 +124,49 @@ function _createParticleEventObjectForStorage(message, log) {
         return obj;
     }
 };
+
+function processReadingsSet(arraySet, obj) {
+    for (let arrayElement = 0; arrayElement < arraySet.length; arrayElement++) {
+        switch (arrayElement) {
+            case 0:
+                obj['Timestamp'] = arraySet[arrayElement];
+                break;
+            case 1:
+                obj['Light level (lux)'] = arraySet[arrayElement];
+                break;
+            case 2:
+                obj['Loudness (dB)'] = arraySet[arrayElement];
+                break;
+            case 3:
+                obj['UV light level'] = arraySet[arrayElement];
+                break;
+            case 4:
+                obj['Pressure (mBar)'] = arraySet[arrayElement];
+                break;
+            case 5:
+                obj['Temperature (*C)'] = arraySet[arrayElement];
+                break;
+            case 6:
+                obj['Relative Humidity (%)'] = arraySet[arrayElement];
+                break;
+            case 7:
+                obj['CO2 (ppm)'] = arraySet[arrayElement];
+                break;
+            case 8:
+                obj['PM1.0 (μg/m3)'] = arraySet[arrayElement];
+                break;
+            case 9:
+                obj['PM2.5 (μg/m3)'] = arraySet[arrayElement];
+                break; 
+            case 10:
+                obj['PM4.0 (μg/m3)'] = arraySet[arrayElement];
+                break;
+            case 11:
+                obj['PM10.0 (μg/m3)'] = arraySet[arrayElement];
+                break;
+        }
+    }
+    return obj;
+}
 
 /* END HELPERS */
