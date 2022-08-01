@@ -43,10 +43,12 @@ console.log(colors.magenta('Authentication successful!'))
 
 function storeEvent(message) {
     let key = datastore.key(message.attributes.device_id);
+    let dataArray;
 
     // Process incoming data
     try {
-        const dataJson = JSON.parse(message.data);
+        dataArray = JSON.parse(String(message.data));
+        console.log(dataArray);
     } catch (err) {
         // Incoming data is not in format of the sensors' data, thus process as the original default
         datastore
@@ -65,33 +67,69 @@ function storeEvent(message) {
     }
     
     // Process the incoming sensor data sets for Database insertion
-    let deviceID;
-
-    // Add each array element into obj, corresponding to its representation
-    for (let arraySetElement = 0; arraySetElement < dataJson.length; arraySetElement++) {
+    for (let arraySetElement = 0; arraySetElement < dataArray.length; arraySetElement++) {
         let obj = {};
-        switch (arraySet) {
-            case (0):
-                deviceID = dataJson[arraySetElement];
-                break;
+        if (arraySetElement == 0) {
+            key = datastore.key(dataArray[arraySetElement]);
+        } else {
+            // Add each array element into obj, corresponding to its representation
+            for (let arrayElement = 0; arrayElement < dataArray[arraySetElement].length; arrayElement++) {
+                let reading;
+                switch (arrayElement) {
+                    case 0:
+                        reading = 'Timestamp';
+                        break;
+                    case 1:
+                        reading = 'Light level (lux)';
+                        break;
+                    case 2:
+                        reading = 'Loudness (dB)';
+                        break;
+                    case 3:
+                        reading = 'UV light level';
+                        break;
+                    case 4:
+                        reading = 'Pressure (mBar)';
+                        break;
+                    case 5:
+                        reading = 'Temperature (*C)';
+                        break;
+                    case 6:
+                        reading = 'Relative Humidity (%)';
+                        break;
+                    case 7:
+                        reading = 'CO2 (ppm)';
+                        break;
+                    case 8:
+                        reading = 'PM1.0 (μg/m3)';
+                        break;
+                    case 9:
+                        reading = 'PM2.5 (μg/m3)';
+                        break; 
+                    case 10:
+                        reading = 'PM4.0 (μg/m3)';
+                        break;
+                    case 11:
+                        reading = 'PM10.0 (μg/m3)';
+                        break;
+                    }
+                
+                obj[reading] = dataArray[arraySetElement][arrayElement];
+            }
             
-            // Process sensor reading set(s)
-            default:
-                obj = processReadingsSet(dataJson[arraySetElement], obj);
+            // Add processed set of sensor readings to Database
+            datastore
+                .save({
+                    key: key,
+                    data: obj
+                })
+                .then(() => {
+                    console.log(colors.green('Particle event stored in Datastore!\r\n'), colors.grey(util.inspect(obj)))
+                })
+                .catch(err => {
+                    console.log(colors.red('There was an error storing the event:'), err);
+                });
         }
-
-        // Add processed set of sensor readings to Database
-        datastore
-            .save({
-                key: deviceID,
-                data: obj
-            })
-            .then(() => {
-                console.log(colors.green('Particle event stored in Datastore!\r\n'), colors.grey(util.inspect(obj)))
-            })
-            .catch(err => {
-                console.log(colors.red('There was an error storing the event:'), err);
-            });
     }
 };
 /* END DATASTORE */
@@ -124,49 +162,5 @@ function _createParticleEventObjectForStorage(message, log) {
         return obj;
     }
 };
-
-function processReadingsSet(arraySet, obj) {
-    for (let arrayElement = 0; arrayElement < arraySet.length; arrayElement++) {
-        switch (arrayElement) {
-            case 0:
-                obj['Timestamp'] = arraySet[arrayElement];
-                break;
-            case 1:
-                obj['Light level (lux)'] = arraySet[arrayElement];
-                break;
-            case 2:
-                obj['Loudness (dB)'] = arraySet[arrayElement];
-                break;
-            case 3:
-                obj['UV light level'] = arraySet[arrayElement];
-                break;
-            case 4:
-                obj['Pressure (mBar)'] = arraySet[arrayElement];
-                break;
-            case 5:
-                obj['Temperature (*C)'] = arraySet[arrayElement];
-                break;
-            case 6:
-                obj['Relative Humidity (%)'] = arraySet[arrayElement];
-                break;
-            case 7:
-                obj['CO2 (ppm)'] = arraySet[arrayElement];
-                break;
-            case 8:
-                obj['PM1.0 (μg/m3)'] = arraySet[arrayElement];
-                break;
-            case 9:
-                obj['PM2.5 (μg/m3)'] = arraySet[arrayElement];
-                break; 
-            case 10:
-                obj['PM4.0 (μg/m3)'] = arraySet[arrayElement];
-                break;
-            case 11:
-                obj['PM10.0 (μg/m3)'] = arraySet[arrayElement];
-                break;
-        }
-    }
-    return obj;
-}
 
 /* END HELPERS */
